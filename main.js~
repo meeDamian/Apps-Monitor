@@ -1,0 +1,5 @@
+$(function(){
+    $('#new_trigger').click(function(){
+        $(this).html('bbbb'); 
+    });
+});

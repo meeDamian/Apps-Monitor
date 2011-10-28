@@ -1,0 +1,58 @@
+<style>
+    #all {
+        width: 200px;
+    }
+    #new input {
+        width: 100%;
+    }
+    #new textarea {
+        width: 100%;
+        height: 60px; 
+    }
+    p {
+        margin-bottom: 0px;
+    }
+    #templates,#apps_added,#new_form {
+        display: none;
+    }
+</style>
+
+<script type="text/javascript" src="jquery.js"></script>
+<script>
+jQuery('#new_trigger').click(function(){
+   jQuery(this).remove(); 
+});
+</script>
+
+<div id="all">
+    <div id="apps_added">
+        <p>Added Apps:</p>
+        <ul id="apps_list">
+            
+        </ul>
+    </div>
+    
+    <div id="new_app">
+        <a href="#" id="new_trigger">Add new app</a>
+        <form id="new_form">
+            <p>Add new app:</p>
+            <input id="new_name" placeholder="Application name" />
+            <textarea id="new_url" placeholder="URL to the JSON file"></textarea>
+        </form>
+    </div>
+    
+    
+    
+
+</div>
+
+<!-- templates: -->
+<div id="templates">
+    <div id="t_added">
+        <li class="app">
+            <p><span class="app_name"></span><span class="app_status"></span></p>
+            <a href="#" class="app_edit">edit</a>
+            <form></form>
+        </li>
+    </div>
+</div>
