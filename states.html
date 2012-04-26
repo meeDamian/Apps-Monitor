@@ -1,26 +1,31 @@
-<style>
-    #all {width: 300px;}
-    #app_name {width: 260px;}
-    #app_submit {width: 35px;}
-    #app_list {display: none;}
-    /* temp */
-    #all2 {display: none;}
-</style>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body {width: 300px;}
+        #auth,#quickInfo{display:none;}
+    </style>
 
-<script type="text/javascript" src="jquery.js"></script>
-<script type="text/javascript" src="main.js"></script>
+    <script type="text/javascript" src="jquery.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+</head>
+<body>
+    <div id="loader">
+        <img src="loader.gif" alt="loading" />
+        <span>Trwa sprawdzanie...</span>
+    </div>
 
-<div id="all">
-    <form id="app_new">
-        <input type="url" name="name" id="app_name" placeholder="link of app to monitor" />
+
+    <form id="auth">
+        <input type="hidden" name="action" value="auth" />
+        <input type="text" name="auth_str" id="auth_str" placeholder="auth string" />
         <input type="submit" id="app_submit" value=">" />
     </form>
-    
-    <ul id="app_list">
-        <li class="app" id="unique_app_id">
-            <span class="app_name"></span>
-            <span class="app_status"></span>
-            <a href="#" class="app_delete">x</a>
-        </li>
-    </ul>
-</div>
+
+    <span id="quickInfo">
+        <span></span>
+        <a href="#"></a>
+    </span>
+</body>
+</html>
