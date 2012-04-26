@@ -12,8 +12,13 @@ $(function(){
             });
         } else {
             $('#loader,#auth').remove();
-            if(data.error) $('#quickInfo span').addClass('error').text('Wystąpił błąd!');
-            else $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
+            if(data.error) {
+                chrome.browserAction.setIcon({path:'error.png'});
+                $('#quickInfo span').addClass('error').text('Wystąpił błąd!');
+            }else {
+                chrome.browserAction.setIcon({path:'icon.png'});
+                $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
+            }
 
             $('#quickInfo a').text('więcej informacji').attr('href',data.url)
                 .click(function(){
