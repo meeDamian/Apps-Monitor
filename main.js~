@@ -26,7 +26,6 @@ function popup() {
             $.getJSON(this.url.for("test"), this.opts._ret(), function(data){
                 if(data.user==false) {
                     s.login.show();
-                    console.log(data);
                 }
                 if( callback!==undefined) callback.call(this);
                 // TODO: check if successfully retrieved
