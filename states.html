@@ -5,6 +5,12 @@
     <style>
         body {width: 300px;}
         #auth,#quickInfo{display:none;}
+        #auth {margin-top:10px}
+        #auth legend{text-align:center}
+        #auth_str{width:232px}
+
+        .success{color:green}
+        .error{color:red}
     </style>
 
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
@@ -23,9 +29,12 @@
     </span>
 
     <form id="auth">
-        <input type="hidden" name="action" value="auth" />
-        <input type="text" name="auth_str" id="auth_str" placeholder="auth string" />
-        <input type="submit" id="app_submit" value=">" />
+        <fieldset>
+            <legend>Zaloguj się, aby mieć dostęp do bardziej szczegółowych danych</legend>
+            <input type="hidden" name="action" value="auth" />
+            <input type="text" name="auth_str" id="auth_str" placeholder="Wklej tu swój unikalny hash" />
+            <input type="submit" id="app_submit" value=">" />
+        </fieldset>
     </form>
 
 </body>

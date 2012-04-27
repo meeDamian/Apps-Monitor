@@ -17,18 +17,18 @@ function popup() {
             _ret:function(){
                 var r={};
                 for(i in this)if(typeof this[i]!=='function'&&this[i]!==null)r[i]=this[i];
-                r.plugin=1; // put here instead of this.opts, because this value is unchangeable!!!
+                r.plugin=1; // is added here because it cannot be differen unchangeable!!!
                 return r;
             },
-            _set:function(o){for(i in o)if(i in this)this[i]=o[i];}
+            _set:function(o){for(i in o)if(i in this)this[i]=o[i];} // o is settings Object vel map
         },
         get:function(callback){
-            $.getJSON(this.url.for("test"), this.opts._ret(), function(data){
+            $.getJSON(this.url.for("test"), this.opts._ret(), function(data) {
                 if(data.user==false) {
                     s.login.show();
-                    console.log(data);
                 }
                 if( callback!==undefined) callback.call(this);
+                else s.raport.show(data);
                 // TODO: check if successfully retrieved
             });
         },
@@ -55,44 +55,38 @@ function popup() {
                 });
             },
             kill:function(){
+                // TODO: copy cookie string to db, so that removing cookies won't really log out 
                 $('#auth').remove();
             }
         },
-        _init:function(opts) {
+        raport:{
+            show:function(data){
+                $('#loader').hide();
+                if(data.error) {
+                    chrome.browserAction.setIcon({path:'error.png'});
+                    $('#quickInfo span').addClass('error').text('Wystąpił błąd!');
+                } else {
+                    chrome.browserAction.setIcon({path:'icon.png'});
+                    $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
+                }
+
+                $('#quickInfo a')
+                    .text('więcej informacji').attr('href',data.url)
+                    .click(function(){
+                        window.open($(this).attr('href'));
+                    });
+                $('#quickInfo').show();
+            }
+
+        },
+        init:function(opts) {
             if(opts!==undefined) this.opts._set(opts);
         }
     }
+
+    // TODO: get database settings object here
+    // TODO: s.init( db.settings_object );
     s.get();
-    return false;
-    $.get(s.url.for("test"), s.opts._ret(), function(data){
-        if(data.error===undefined) {
-            $('#auth').submit(function(){
-                $('#loader').show();
-                $.post(s.url.for("ajax"),$(this).serialize(),function(data){
-                    $('#loader').hide();
-                    if(!data.success) $('#quickInfo').show().children('span').text(data.cause);
-                    else { }
-                });
-                return false;
-            });
-        } else {
-            $('#loader').remove();
-            if(data.error) {
-                chrome.browserAction.setIcon({path:'error.png'});
-                $('#quickInfo span').addClass('error').text('Wystąpił błąd!');
-            }else {
-                chrome.browserAction.setIcon({path:'icon.png'});
-                $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
-            }
-
-            $('#quickInfo a').text('więcej informacji').attr('href',data.url)
-                .click(function(){
-                    window.open($(this).attr('href'));
-                });
-            $('#quickInfo').show();
-        }
-
-    });
 }
 function settings() {
     s = {
@@ -256,7 +250,7 @@ var db={};
 
 $(function(){
     var s;
-    prep_db();
+    //prep_db();
 
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
