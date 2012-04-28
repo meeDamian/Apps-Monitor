@@ -81,6 +81,7 @@ function popup() {
         },
         init:function(opts) {
             if(opts!==undefined) this.opts._set(opts);
+            this.get();
         }
     }
 
@@ -160,38 +161,177 @@ function background(){
         },
         int = setInterval(check,10000);
 }
-
-function prep_db() {
-
+function prep_db2(){
+    window.html5rocks = {};
     var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB;
+
     if ('webkitIndexedDB' in window) {
-        window.IDBTransaction = window.webkitIDBTransaction;
         window.IDBKeyRange = window.webkitIDBKeyRange;
+        window.IDBTransaction = window.webkitIDBTransaction;
+        window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
     }
 
-    db = {
-        db:null,
-        open:function() {
-            var request = indexedDB.open("settings","All of the extension settings are stored here");
+    html5rocks.indexedDB = {
+        db: null,
+        onerror: function(e) {
+            console.log(e);
+        },
+        open: function() {
+            var request = indexedDB.open("todos");
 
-            request.onsuccess = function(e){
-                var v = "1.1";
-                db.db = e.target.result;
-                if(v != db.db.version) {
-                    var setVrequest = db.db.setVersion(v);
+            request.upgradeneeded = function(e){
+                console.log("Upgrade that shit");
+            }
 
-                    setVrequest.onfailure = db.onerror;
+            request.onsuccess = function(e) {
+                var v = "1.99";
+                html5rocks.indexedDB.db = e.target.result;
+                var db = html5rocks.indexedDB.db;
+                // We can only create Object stores in a setVersion transaction;
+                if (v!= db.version) {
+                    var setVrequest = db.setVersion(v);
+
+                    // onsuccess is the only place we can create Object Stores
+                    setVrequest.onerror = html5rocks.indexedDB.onerror;
                     setVrequest.onsuccess = function(e) {
-                        var store = db.db.createObjectStore("settings",{keyPath:"timestamp"});
-                        db.getSettings();
+                        if(db.objectStoreNames.contains("todo")) {
+                            db.deleteObjectStore("todo");
+                        }
+
+                        var store = db.createObjectStore("todo", {keyPath: "timeStamp"});
+
+                        html5rocks.indexedDB.getAllTodoItems();
                     };
                 }
-                db.getSettings();
+                else {
+                    html5rocks.indexedDB.getAllTodoItems();
+                }
+            };
+
+            request.onerror = html5rocks.indexedDB.onerror;
+        },
+        addTodo: function(todoText) {
+            var db = html5rocks.indexedDB.db,
+                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
+                store = trans.objectStore("todo"),
+
+                data = {
+                    "text": todoText,
+                    "timeStamp": new Date().getTime()
+                },
+                request = store.put(data);
+
+            request.onsuccess = function(e) {
+                html5rocks.indexedDB.getAllTodoItems();
+            };
+
+            request.onerror = function(e) {
+                console.log("Error Adding: ", e);
+            };
+        },
+        deleteTodo: function(id) {
+            var db = html5rocks.indexedDB.db,
+                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
+                store = trans.objectStore("todo"),
+                request = store.delete(id);
+
+            request.onsuccess = function(e) {
+                html5rocks.indexedDB.getAllTodoItems();
+            };
+
+            request.onerror = function(e) {
+                console.log("Error Adding: ", e);
+            };
+        },
+        getAllTodoItems: function() {
+
+            var db = html5rocks.indexedDB.db,
+                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
+                store = trans.objectStore("todo");
+
+            // Get everything in the store;
+            var keyRange = IDBKeyRange.lowerBound(0),
+                cursorRequest = store.openCursor(keyRange);
+
+            cursorRequest.onsuccess = function(e) {
+                var result = e.target.result;
+                if(!!result == false) return;
+
+                console.log(result.value);
+                result.continue();
+            };
+
+            cursorRequest.onerror = html5rocks.indexedDB.onerror;
+        }
+    };
+
+    function init() {
+        html5rocks.indexedDB.open();
+    }
+
+    window.addEventListener("DOMContentLoaded", init, false);
+}
+function prep_db() {
+
+    // Required by the browser
+    var indexedDB = window.indexedDB || window.webkitIndexedDB;
+    if ('webkitIndexedDB' in window) {
+        window.IDBKeyRange = window.webkitIDBKeyRange;
+        window.IDBTransaction = window.webkitIDBTransaction;
+        window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
+    }
+
+    // database object
+    db = {
+        h:null, // Handler to the db
+        open:function() {
+            var r = indexedDB.open("appsMonitor",3);
+
+            // Not yet supported by webkit ;(
+            r.onupgradeneeded = function(e){
+                console.log("Upgrade that shit");
             }
-            request.onfailure = db.onerror;
+
+            r.onsuccess = function(e){
+                db.h = e.target.result;
+
+                if(chrome.app.getDetails().version !== db.h.version) {
+
+                    var v = db.h.setVersion( chrome.app.getDetails().version );
+                    v.onsuccess = function(e) {
+
+                        if(db.h.contains("settings")) db.h.deleteObjectStore("settings");
+                        db.h.createObjectStore("settings", { autoIncrement:true });
+                    };
+                    v.onfailure = db.onerror;
+                }
+
+                // tmp
+                db.saveSettings(db.nigga);
+            }
+            r.onfailure = db.onerror;
+        },
+        saveSettings:function(options,value){
+
+            var map = {};
+            if(typeof options=="string" && typeof value=="string") map[options]=value;
+            else map = options;
+
+            console.log(map);
+
+            var t = db.h.transaction(["settings"], IDBTransaction.READ_WRITE),
+                s = t.objectStore("settings"),
+                r = s.put( map );
+
+            r.onsuccess = function(e) {
+                console.log("SAVE success");
+            }
+            r.onerror = function(e){
+                console.log("SAVE error");
+            }
         },
         addSetting:function(nanana){
-            var trans = db.db.transaction(["settings"], IDBTransaction.READ_WRITE);
+            var trans = db.h.transaction(["appsMonitor"], IDBTransaction.READ_WRITE);
             var store = trans.objectStore("settings");
             var request = store.put({
                 "text":nanana,
@@ -206,8 +346,11 @@ function prep_db() {
                 console.log(e.value);
             }
         },
+        clear:function(){
+            
+        },
         getSettings:function(){
-            var trans = db.db.transaction(["settings"],IDBTransaction.READ_WRITE);
+            var trans = db.h.transaction(["appsMonitor"],IDBTransaction.READ_WRITE);
             var store = trans.objectStore("settings");
 
             var keyRange = IDBKeyRange.lowerBound(0);
@@ -224,7 +367,7 @@ function prep_db() {
             cursorRequest.onerror = db.onerror;
         },
         deleteSetting:function(id) {
-            var trans = db.db.transaction(["settings"], IDBTransaction.READ_WRITE);
+            var trans = db.h.transaction(["appsMonitor"], IDBTransaction.READ_WRITE);
             var store = trans.objectStore("settings");
 
             var request = store.delete(id);
@@ -238,19 +381,22 @@ function prep_db() {
             }
         },
         onerror:function(e){
+            console.log("Masz blad debilu:");
             console.log(e);
         },
         _init:function(){
             db.open();
         }
     };
+
     window.addEventListener("DOMContentLoaded", db._init, false);
+    db.nigga = {"params":"true"};
 }
 var db={};
 
 $(function(){
     var s;
-    //prep_db();
+    prep_db();
 
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
