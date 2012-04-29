@@ -1,4 +1,122 @@
+// Required by the current webkit implementation
+var indexedDB = window.indexedDB || window.webkitIndexedDB;
+if ('webkitIndexedDB' in window) {
+    window.IDBKeyRange = window.webkitIDBKeyRange;
+    window.IDBTransaction = window.webkitIDBTransaction;
+    window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
+}
+
+// database object
+window.db = {
+    name:"appsMonitor",
+    _settings:"settings",
+    _cache:"cache",
+
+    h:null, // Handler to the db
+
+    open:function() {
+        var r = indexedDB.open( db.name );
+        r.onupgradeneeded = function(e){ console.log(".onupgradeneeded is not yet supported by webkit"); };
+        r.onsuccess = function(e){
+            db.h = e.target.result;
+
+            if(chrome.app.getDetails().version !== db.h.version) {
+
+                var v = db.h.setVersion( chrome.app.getDetails().version );
+                v.onsuccess = function(e) {
+                    if(db.h.objectStoreNames.contains( db._settings )) db.h.deleteObjectStore( db._settings );
+                    db.h.createObjectStore(db._settings, { keyPath:"name" });
+
+                    if(db.h.objectStoreNames.contains( db._cache )) db.h.deleteObjectStore( db._cache );
+                    db.h.createObjectStore(db._cache, { autoIncrement:true });
+                };
+                v.onfailure = db.onerror;
+                v.onerror = db.onerror;
+                v.onblocked = db.onerror;
+            }
+            db.getSettings();
+        };
+        r.onfailure = db.onerror;
+    },
+    saveSettings:function(options,value,arg3){
+
+        var map = [],callback=null;
+        if(typeof options=="string"){
+            map = [{name:options, value:value}];
+            if(typeof arg3=="function") callback=arg3;
+        } else {
+            for(i in options) map.push({name:i,value:options[i]});
+            if(typeof value=="function") callback=value;
+        }
+
+        var t = db.h.transaction([db._settings], IDBTransaction.READ_WRITE),
+            s = t.objectStore(db._settings);
+
+        for( i in map){
+            var r = s.put( map[i] );
+            r.onsuccess = function(e){ console.log("SAVE success"); }
+            r.onerror = function(e){ console.log("SAVE error"); }
+        }
+    },
+    getSettings:function(){
+        var t = db.h.transaction([db._settings], IDBTransaction.READ_ONLY),
+            s = t.objectStore(db._settings),
+            keyRange = IDBKeyRange.lowerBound(0),
+            cursorRequest = s.openCursor(keyRange),
+            tmp = {};
+
+        cursorRequest.onsuccess = function(e) {
+
+            var result = e.target.result;
+            if(!!result==false) {
+                options.set(tmp);
+                return;
+            }
+
+            tmp[result.value.name] = result.value.value;
+
+            result.continue();
+        }
+
+        cursorRequest.onerror = db.onerror;
+    },
+    onerror:function(e){
+        console.log("Masz blad debilu:");
+        console.log(e);
+    },
+    _init:function(){
+        db.open();
+    }
+};
+window.options = {
+    level:{ v:null, d:0 },
+    sms:{ v:null, d:"auto" },
+    dev:{ v:null, d:false },
+    legacy:{ v:null, d:false },
+    manual:{ v:null, d:false },
+    days:{ v:null, d:2 },
+    params:{ v:null, d:false },
+    get:function(arg0){
+        if(typeof arg0=="string")return(arg0 in this&&typeof this[arg0]!=="function")?(this[arg0].v!==null)?this[arg0].v:this[arg0].d:null;
+        var r={};
+        for(i in this)if(typeof this[i]!=='function'&&this[i].v!==null)r[i]=this[i].v;
+        r.plugin=1; // is added here because it cannot be different -  unchangeable!!!
+        return r;
+    },
+    _set:function(o,o2){
+        if(typeof o=="string") if(o in this) this[o].v=(o2!==this[o].d)?o2:null;
+        else for(i in o) if(i in this) this[i].v=(o[i]!==this[i].d)?o[i]:null;
+        
+    },
+    set:function(o){options._set(o);},
+    save:function(which){
+        if(typeof which=="string") db.saveSettings(which,this.get(which));
+        else db.saveSettings(this.get());
+    }
+};
+
 function popup() {
+    
     s = {
         url:{
             main:'http://facebook.webtop.pl/templates/tests/',
@@ -7,20 +125,30 @@ function popup() {
             for:function(i){return this.main+this[i];}
         },
         opts: {
-            level:1,    // default: 1
-            sms:null,   // default: auto
-            dev:null,   // default: false
-            legacy:null,// default: false
-            manual:null,// default: false
-            days:null,  // default: 2
-            params:null,// default: false
+            level:{ v:1, d:1 },
+            sms:{ v:null, d:"auto" },
+            dev:{ v:null, d:false },
+            legacy:{ v:null, d:false },
+            manual:{ v:null, d:false },
+            days:{ v:null, d:2 },
+            params:{ v:null, d:false },
             _ret:function(){
                 var r={};
-                for(i in this)if(typeof this[i]!=='function'&&this[i]!==null)r[i]=this[i];
-                r.plugin=1; // is added here because it cannot be differen unchangeable!!!
+                for(i in this)if(typeof this[i]!=='function'&&this[i].v!==null)r[i]=this[i].v;
+                r.plugin=1; // is added here because it cannot be different -  unchangeable!!!
                 return r;
             },
-            _set:function(o){for(i in o)if(i in this)this[i]=o[i];} // o is settings Object vel map
+            _set:function(o){
+                console.log(this);
+                for(i in o)if(i in this) {
+                    console.log(i+": "+this[i].v+"=>"+o[i]);
+                    this[i].v=(o[i]!==this[i].d)?o[i]:null;
+                }
+            },
+            set:function(o){
+                console.log("AAA");
+                s.opts._set(o);
+            }
         },
         get:function(callback){
             $.getJSON(this.url.for("test"), this.opts._ret(), function(data) {
@@ -161,244 +289,14 @@ function background(){
         },
         int = setInterval(check,10000);
 }
-function prep_db2(){
-    window.html5rocks = {};
-    var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB;
 
-    if ('webkitIndexedDB' in window) {
-        window.IDBKeyRange = window.webkitIDBKeyRange;
-        window.IDBTransaction = window.webkitIDBTransaction;
-        window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
-    }
-
-    html5rocks.indexedDB = {
-        db: null,
-        onerror: function(e) {
-            console.log(e);
-        },
-        open: function() {
-            var request = indexedDB.open("todos");
-
-            request.upgradeneeded = function(e){
-                console.log("Upgrade that shit");
-            }
-
-            request.onsuccess = function(e) {
-                var v = "1.99";
-                html5rocks.indexedDB.db = e.target.result;
-                var db = html5rocks.indexedDB.db;
-                // We can only create Object stores in a setVersion transaction;
-                if (v!= db.version) {
-                    var setVrequest = db.setVersion(v);
-
-                    // onsuccess is the only place we can create Object Stores
-                    setVrequest.onerror = html5rocks.indexedDB.onerror;
-                    setVrequest.onsuccess = function(e) {
-                        if(db.objectStoreNames.contains("todo")) {
-                            db.deleteObjectStore("todo");
-                        }
-
-                        var store = db.createObjectStore("todo", {keyPath: "timeStamp"});
-
-                        html5rocks.indexedDB.getAllTodoItems();
-                    };
-                }
-                else {
-                    html5rocks.indexedDB.getAllTodoItems();
-                }
-            };
-
-            request.onerror = html5rocks.indexedDB.onerror;
-        },
-        addTodo: function(todoText) {
-            var db = html5rocks.indexedDB.db,
-                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
-                store = trans.objectStore("todo"),
-
-                data = {
-                    "text": todoText,
-                    "timeStamp": new Date().getTime()
-                },
-                request = store.put(data);
-
-            request.onsuccess = function(e) {
-                html5rocks.indexedDB.getAllTodoItems();
-            };
-
-            request.onerror = function(e) {
-                console.log("Error Adding: ", e);
-            };
-        },
-        deleteTodo: function(id) {
-            var db = html5rocks.indexedDB.db,
-                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
-                store = trans.objectStore("todo"),
-                request = store.delete(id);
-
-            request.onsuccess = function(e) {
-                html5rocks.indexedDB.getAllTodoItems();
-            };
-
-            request.onerror = function(e) {
-                console.log("Error Adding: ", e);
-            };
-        },
-        getAllTodoItems: function() {
-
-            var db = html5rocks.indexedDB.db,
-                trans = db.transaction(["todo"], IDBTransaction.READ_WRITE),
-                store = trans.objectStore("todo");
-
-            // Get everything in the store;
-            var keyRange = IDBKeyRange.lowerBound(0),
-                cursorRequest = store.openCursor(keyRange);
-
-            cursorRequest.onsuccess = function(e) {
-                var result = e.target.result;
-                if(!!result == false) return;
-
-                console.log(result.value);
-                result.continue();
-            };
-
-            cursorRequest.onerror = html5rocks.indexedDB.onerror;
-        }
-    };
-
-    function init() {
-        html5rocks.indexedDB.open();
-    }
-
-    window.addEventListener("DOMContentLoaded", init, false);
-}
-function prep_db() {
-
-    // Required by the browser
-    var indexedDB = window.indexedDB || window.webkitIndexedDB;
-    if ('webkitIndexedDB' in window) {
-        window.IDBKeyRange = window.webkitIDBKeyRange;
-        window.IDBTransaction = window.webkitIDBTransaction;
-        window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
-    }
-
-    // database object
-    db = {
-        h:null, // Handler to the db
-        open:function() {
-            var r = indexedDB.open("appsMonitor",3);
-
-            // Not yet supported by webkit ;(
-            r.onupgradeneeded = function(e){
-                console.log("Upgrade that shit");
-            }
-
-            r.onsuccess = function(e){
-                db.h = e.target.result;
-
-                if(chrome.app.getDetails().version !== db.h.version) {
-
-                    var v = db.h.setVersion( chrome.app.getDetails().version );
-                    v.onsuccess = function(e) {
-
-                        if(db.h.contains("settings")) db.h.deleteObjectStore("settings");
-                        db.h.createObjectStore("settings", { autoIncrement:true });
-                    };
-                    v.onfailure = db.onerror;
-                }
-
-                // tmp
-                db.saveSettings(db.nigga);
-            }
-            r.onfailure = db.onerror;
-        },
-        saveSettings:function(options,value){
-
-            var map = {};
-            if(typeof options=="string" && typeof value=="string") map[options]=value;
-            else map = options;
-
-            console.log(map);
-
-            var t = db.h.transaction(["settings"], IDBTransaction.READ_WRITE),
-                s = t.objectStore("settings"),
-                r = s.put( map );
-
-            r.onsuccess = function(e) {
-                console.log("SAVE success");
-            }
-            r.onerror = function(e){
-                console.log("SAVE error");
-            }
-        },
-        addSetting:function(nanana){
-            var trans = db.h.transaction(["appsMonitor"], IDBTransaction.READ_WRITE);
-            var store = trans.objectStore("settings");
-            var request = store.put({
-                "text":nanana,
-                "timestamp": new Date().getTime()
-            });
-
-            request.onsuccess = function(e) {
-                db.getSettings();
-            };
-
-            request.onerror = function(e){
-                console.log(e.value);
-            }
-        },
-        clear:function(){
-            
-        },
-        getSettings:function(){
-            var trans = db.h.transaction(["appsMonitor"],IDBTransaction.READ_WRITE);
-            var store = trans.objectStore("settings");
-
-            var keyRange = IDBKeyRange.lowerBound(0);
-            var cursorRequest = store.openCursor(keyRange);
-
-            cursorRequest.onsuccess = function(e) {
-                var result = e.target.result;
-                if(!!result==false) return;
-
-                console.log(result.value);
-                result.continue();
-            }
-
-            cursorRequest.onerror = db.onerror;
-        },
-        deleteSetting:function(id) {
-            var trans = db.h.transaction(["appsMonitor"], IDBTransaction.READ_WRITE);
-            var store = trans.objectStore("settings");
-
-            var request = store.delete(id);
-
-            request.onsuccess = function(e) {
-                db.getSettings();
-            }
-
-            request.onerror = function(e){
-                console.log(e);
-            }
-        },
-        onerror:function(e){
-            console.log("Masz blad debilu:");
-            console.log(e);
-        },
-        _init:function(){
-            db.open();
-        }
-    };
-
-    window.addEventListener("DOMContentLoaded", db._init, false);
-    db.nigga = {"params":"true"};
-}
-var db={};
+var s;
 
 $(function(){
-    var s;
-    prep_db();
 
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
     else background();
+
+    window.addEventListener("DOMContentLoaded", db._init, false);
 });
