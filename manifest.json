@@ -1,6 +1,6 @@
 {
     "name": "Apps Monitor",
-    "version": "0.22",
+    "version": "0.23",
     "description": "Extension used to monitor apps over the JSON handle",
     "options_page":"settings.html",
     "browser_action": {

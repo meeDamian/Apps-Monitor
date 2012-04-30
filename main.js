@@ -14,7 +14,7 @@ window.db = {
 
     h:null, // Handler to the db
 
-    open:function(callback) {
+    open:function(callback) { // opens db and assigns it to db.h (as in Handler); performs upgrade if needed
         var r = indexedDB.open( db.name );
         r.onupgradeneeded = function(e){ console.log(".onupgradeneeded is not yet supported by webkit"); };
         r.onsuccess = function(e){
@@ -38,7 +38,7 @@ window.db = {
         };
         r.onfailure = db.onerror;
     },
-    saveSettings:function(opts,value,arg3){
+    saveSettings:function(opts,value,arg3){ // saves settings posibilities: db.saveSettings("name","value", [callback]), db.saveSettings({name1:"val1",name2:false},[callback])
         var map = [],callback=null;
         if(typeof opts=="string"){
             map = [{name:opts, value:value}];
@@ -58,7 +58,7 @@ window.db = {
         }
         if(callback!==null) callback.call(window);
     },
-    removeSettings:function(name){
+    removeSettings:function(name){ // remove object of given name
         var t = db.h.transaction([db._settings], IDBTransaction.READ_WRITE),
             s = t.objectStore(db._settings),
             r = s.delete(name);
@@ -66,7 +66,7 @@ window.db = {
         r.onerror = function(e){ console.log("DELETE error("+name+")"); }
 
     },
-    getSettings:function(){
+    getSettings:function(){ // updates options object
         var t = db.h.transaction([db._settings], IDBTransaction.READ_ONLY),
             s = t.objectStore(db._settings),
             keyRange = IDBKeyRange.lowerBound(0),
@@ -77,6 +77,8 @@ window.db = {
             var result = e.target.result;
             if(!!result==false) {
                 options.restore( tmp );
+                console.log(window.s);
+                if(window.s!=undefined)window.s.get();
                 return;
             }
             tmp[result.value.name] = result.value.value;
@@ -84,12 +86,9 @@ window.db = {
         }
         cursorRequest.onerror = db.onerror;
     },
-    onerror:function(e){
+    onerror:function(e){ // is called on error; TODO: improve error reporting here
         console.log("Masz blad debilu:");
         console.log(e);
-    },
-    _init:function(callback){
-        db.open(callback);
     }
 };
 window.options = {
@@ -109,7 +108,7 @@ window.options = {
     },
     restore:function(o){  // restores settings from db
         for(i in o)if(i in this)this[i].v=(o[i]!==this[i].d)?o[i]:null;
-        if(s.restoreState!==null) s.restoreState.call(s,options.get()); // runs only on settings page
+        if(s.restoreState!==undefined) s.restoreState.call(s,options.get()); // fired only on settings page
     },
     set:function(o,v){ // sets value in this object and saves to db
         if(o in this) {
@@ -177,11 +176,14 @@ function popup() {
                     $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
                 }
 
-                $('#quickInfo a')
-                    .text('więcej informacji').attr('href',data.url)
-                    .click(function(){
-                        window.open($(this).attr('href'));
-                    });
+                if(data.url!=undefined){
+                    $('#quickInfo a')
+                        .text('więcej informacji').attr('href',data.url)
+                        .click(function(){
+                            window.open($(this).attr('href'));
+                        });
+                } else $('#quickInfo a').hide();
+
                 $('#quickInfo').show();
             }
         }
@@ -189,7 +191,7 @@ function popup() {
 
     // TODO: get database settings object here
     // TODO: s.init( db.settings_object );
-    s.get();
+    //s.get();
 }
 function settings() {
     s = {
@@ -219,17 +221,16 @@ function settings() {
         },
         fixLabel:function(onchange){
             if($(this).attr('type')=="range"){
-                var label=  "",
-                    min=    $(this).attr('min'),
-                    n=      $(this).parent().attr('title'),
-                    j=      parseInt($(this).val()),
-                    i=      j-min;
+                var label="",
+                    min=$(this).attr('min'),
+                    n=$(this).parent().attr('title'),
+                    j=parseInt($(this).val()),
+                    i=j-min; // fix for when min!=0
 
                 if(typeof s[n]==="object") do label=s[n][j-min]+label;while(label[1]==="+"&&--j>=0);
                 else label=j+s[n];
 
                 $(this).siblings('label').text(label);
-
             } else if($(this).attr('type')=="checkbox") {
                 var n=$(this).attr('name'),
                     i=s[n].val=Boolean($(this).filter(":checked").length); // TODO: save to options instead
@@ -257,14 +258,13 @@ function background(){
 var s;
 
 function init(){
+    db.getSettings();
+
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
     else background();
 }
 
 $(function(){
-
-    db._init( db.getSettings );
-    window.addEventListener("DOMContentLoaded", init, false);
-
+    db.open( init ); // run init after db is available
 });
