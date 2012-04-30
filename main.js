@@ -14,7 +14,7 @@ window.db = {
 
     h:null, // Handler to the db
 
-    open:function() {
+    open:function(callback) {
         var r = indexedDB.open( db.name );
         r.onupgradeneeded = function(e){ console.log(".onupgradeneeded is not yet supported by webkit"); };
         r.onsuccess = function(e){
@@ -34,18 +34,17 @@ window.db = {
                 v.onerror = db.onerror;
                 v.onblocked = db.onerror;
             }
-            db.getSettings();
+            if(typeof callback=="function") callback.call(window);
         };
         r.onfailure = db.onerror;
     },
-    saveSettings:function(options,value,arg3){
-
+    saveSettings:function(opts,value,arg3){
         var map = [],callback=null;
-        if(typeof options=="string"){
-            map = [{name:options, value:value}];
+        if(typeof opts=="string"){
+            map = [{name:opts, value:value}];
             if(typeof arg3=="function") callback=arg3;
         } else {
-            for(i in options) map.push({name:i,value:options[i]});
+            for(i in opts) map.push({name:i,value:opts[i]});
             if(typeof value=="function") callback=value;
         }
 
@@ -54,9 +53,18 @@ window.db = {
 
         for( i in map){
             var r = s.put( map[i] );
-            r.onsuccess = function(e){ console.log("SAVE success"); }
-            r.onerror = function(e){ console.log("SAVE error"); }
+            r.onsuccess = function(e){ console.log("SAVE success("+map[i].name+"=>"+map[i].value+")"); }
+            r.onerror = function(e){ console.log("SAVE error("+map[i].name+"=>"+map[i].value+")"); }
         }
+        if(callback!==null) callback.call(window);
+    },
+    removeSettings:function(name){
+        var t = db.h.transaction([db._settings], IDBTransaction.READ_WRITE),
+            s = t.objectStore(db._settings),
+            r = s.delete(name);
+        r.onsuccess = function(e){ console.log("DELETE success("+name+")"); }
+        r.onerror = function(e){ console.log("DELETE error("+name+")"); }
+
     },
     getSettings:function(){
         var t = db.h.transaction([db._settings], IDBTransaction.READ_ONLY),
@@ -66,57 +74,54 @@ window.db = {
             tmp = {};
 
         cursorRequest.onsuccess = function(e) {
-
             var result = e.target.result;
             if(!!result==false) {
-                options.set(tmp);
+                options.restore( tmp );
                 return;
             }
-
             tmp[result.value.name] = result.value.value;
-
             result.continue();
         }
-
         cursorRequest.onerror = db.onerror;
     },
     onerror:function(e){
         console.log("Masz blad debilu:");
         console.log(e);
     },
-    _init:function(){
-        db.open();
+    _init:function(callback){
+        db.open(callback);
     }
 };
 window.options = {
     level:{ v:null, d:0 },
-    sms:{ v:null, d:"auto" },
+    sms:{ v:null, d:1 }, // 1 vel auto
     dev:{ v:null, d:false },
     legacy:{ v:null, d:false },
     manual:{ v:null, d:false },
     days:{ v:null, d:2 },
     params:{ v:null, d:false },
-    get:function(arg0){
+    get:function(arg0) { // if no arguments given - returns map, if valid key given returns it's value
         if(typeof arg0=="string")return(arg0 in this&&typeof this[arg0]!=="function")?(this[arg0].v!==null)?this[arg0].v:this[arg0].d:null;
         var r={};
         for(i in this)if(typeof this[i]!=='function'&&this[i].v!==null)r[i]=this[i].v;
         r.plugin=1; // is added here because it cannot be different -  unchangeable!!!
         return r;
     },
-    _set:function(o,o2){
-        if(typeof o=="string") if(o in this) this[o].v=(o2!==this[o].d)?o2:null;
-        else for(i in o) if(i in this) this[i].v=(o[i]!==this[i].d)?o[i]:null;
-        
+    restore:function(o){  // restores settings from db
+        for(i in o)if(i in this)this[i].v=(o[i]!==this[i].d)?o[i]:null;
+        if(s.restoreState!==null) s.restoreState.call(s,options.get()); // runs only on settings page
     },
-    set:function(o){options._set(o);},
-    save:function(which){
-        if(typeof which=="string") db.saveSettings(which,this.get(which));
-        else db.saveSettings(this.get());
+    set:function(o,v){ // sets value in this object and saves to db
+        if(o in this) {
+            this[o].v =(this[o].d!==v)?v:null;
+            if(this[o].v!==null) db.saveSettings(o,this[o].v);
+            else db.removeSettings(o);
+        }
     }
 };
 
 function popup() {
-    
+
     s = {
         url:{
             main:'http://facebook.webtop.pl/templates/tests/',
@@ -124,34 +129,8 @@ function popup() {
             ajax:'do.php',
             for:function(i){return this.main+this[i];}
         },
-        opts: {
-            level:{ v:1, d:1 },
-            sms:{ v:null, d:"auto" },
-            dev:{ v:null, d:false },
-            legacy:{ v:null, d:false },
-            manual:{ v:null, d:false },
-            days:{ v:null, d:2 },
-            params:{ v:null, d:false },
-            _ret:function(){
-                var r={};
-                for(i in this)if(typeof this[i]!=='function'&&this[i].v!==null)r[i]=this[i].v;
-                r.plugin=1; // is added here because it cannot be different -  unchangeable!!!
-                return r;
-            },
-            _set:function(o){
-                console.log(this);
-                for(i in o)if(i in this) {
-                    console.log(i+": "+this[i].v+"=>"+o[i]);
-                    this[i].v=(o[i]!==this[i].d)?o[i]:null;
-                }
-            },
-            set:function(o){
-                console.log("AAA");
-                s.opts._set(o);
-            }
-        },
         get:function(callback){
-            $.getJSON(this.url.for("test"), this.opts._ret(), function(data) {
+            $.getJSON(this.url.for("test"), options.get(), function(data) {
                 if(data.user==false) {
                     s.login.show();
                 }
@@ -183,7 +162,7 @@ function popup() {
                 });
             },
             kill:function(){
-                // TODO: copy cookie string to db, so that removing cookies won't really log out 
+                // TODO: copy cookie string to db, so that removing cookies won't really log out
                 $('#auth').remove();
             }
         },
@@ -205,11 +184,6 @@ function popup() {
                     });
                 $('#quickInfo').show();
             }
-
-        },
-        init:function(opts) {
-            if(opts!==undefined) this.opts._set(opts);
-            this.get();
         }
     }
 
@@ -219,84 +193,78 @@ function popup() {
 }
 function settings() {
     s = {
-        level:{
-            val:null,
-            label:[
-                "Malutko",
-                "Całkiem sporo",
-                " + czasy wykonań"
-            ],
-            set:function(v){
-                this.val=v;
-                // TODO: save to indexed db;
+        level:[
+            "Tylko stan",
+            " + Podstawowe info",
+            "Całkiem sporo",
+            " + czasy wykonań"
+        ],
+        sms:[
+            "Zawsze Wyłączone",
+            "Automatycznie",
+            "Zawsze Włączone"
+        ],
+        days:"dni",
+        manual:["Nie","Tak,"],
+        dev:["Nie","Tak,"],
+        legacy:["Nie","Tak,"],
+        params:["Nie","Tak,"],
+        restoreState:function(o){
+            for(i in o) {
+                var $n = $("#"+i);
+                if($n.attr('type')=="range") $n.val(o[i]+parseInt($n.attr("min")));
+                else $n.prop("checked",o[i]);
             }
+            this.fixLabels();
         },
-        sms:{
-            val:null,
-            label:[
-                "Zawsze Wyłączone",
-                "Automatycznie",
-                "Zawsze Włączone"
-            ]
-        },
-        days:{
-            val:null,
-            label:"dni"
-        },
-        manual:{
-            val:null,
-            label:["Nie","Tak,"]
-        },
-        dev:{
-            val:null,
-            label:["Nie","Tak,"]
-        },
-        legacy:{
-            val:null,
-            label:["Nie","Tak,"]
-        },
-        params:{
-            val:null,
-            label:["Nie","Tak,"]
-        },
-        restoreState:function(){
+        fixLabel:function(onchange){
+            if($(this).attr('type')=="range"){
+                var label=  "",
+                    min=    $(this).attr('min'),
+                    n=      $(this).parent().attr('title'),
+                    j=      parseInt($(this).val()),
+                    i=      j-min;
 
+                if(typeof s[n]==="object") do label=s[n][j-min]+label;while(label[1]==="+"&&--j>=0);
+                else label=j+s[n];
+
+                $(this).siblings('label').text(label);
+
+            } else if($(this).attr('type')=="checkbox") {
+                var n=$(this).attr('name'),
+                    i=s[n].val=Boolean($(this).filter(":checked").length); // TODO: save to options instead
+
+                $(this).siblings('label').children('.curr').text(s[n][(i)?1:0]);
+            } else return false;
+
+            if(onchange===true) options.set(n,i);
+        },
+        fixLabels:function(){
+            for(i in this) if(typeof i !="function") this.fixLabel.call( $('#'+i),false );
         }
     }
 
-    $('input[type=range]').change(function(){
-        var label="",
-            min=$(this).attr('min'),
-            n=$(this).parent().attr('title'),
-            i=s[n].val=parseInt($(this).val());
-
-        if(typeof s[n].label==="object") do label=s[n].label[i-min]+label;while(label[1]==="+"&&--i>0);
-        else label=i+s[n].label;
-
-        $(this).siblings('label').text(label);
-    }).change();
-
-    $('input[type=checkbox]').change(function(){
-        var n=$(this).attr('name'),
-         i=s[n].val=parseInt($(this).filter(":checked").length);
-         $(this).siblings('label').children('.curr').text(s[n].label[i]);
-    }).change();
+    $('input').change(function(){ s.fixLabel.call( $(this), true ); });
 }
 function background(){
     return false;
     var check = function(){
 
-        },
-        int = setInterval(check,10000);
+    },
+    int = setInterval(check,10000);
 }
 
 var s;
 
-$(function(){
-
+function init(){
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
     else background();
+}
 
-    window.addEventListener("DOMContentLoaded", db._init, false);
+$(function(){
+
+    db._init( db.getSettings );
+    window.addEventListener("DOMContentLoaded", init, false);
+
 });
