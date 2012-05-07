@@ -6,7 +6,8 @@ if ('webkitIndexedDB' in window) {
     window.IDBKeyRangeeyRange = window.webkitIDBKeyRange;
 }
 
-// database object
+// global objects
+window.s = {}; // TODO: do something with this ugly `s` object :/
 window.db = {
     name:"appsMonitor",
     _settings:"settings",
@@ -77,8 +78,7 @@ window.db = {
             var result = e.target.result;
             if(!!result==false) {
                 options.restore( tmp );
-                console.log(window.s);
-                if(window.s!=undefined)window.s.get();
+                if(window.s.get!=undefined)window.s.get();
                 return;
             }
             tmp[result.value.name] = result.value.value;
@@ -99,6 +99,7 @@ window.options = {
     manual:{ v:null, d:false },
     days:{ v:null, d:2 },
     params:{ v:null, d:false },
+    interval:{v:null, d:2 },
     get:function(arg0) { // if no arguments given - returns map, if valid key given returns it's value
         if(typeof arg0=="string")return(arg0 in this&&typeof this[arg0]!=="function")?(this[arg0].v!==null)?this[arg0].v:this[arg0].d:null;
         var r={};
@@ -116,20 +117,20 @@ window.options = {
             if(this[o].v!==null) db.saveSettings(o,this[o].v);
             else db.removeSettings(o);
         }
+    },
+    url:{
+        main:'http://facebook.webtop.pl/templates/tests/',
+        test:'db_test.php',
+        ajax:'do.php',
+        for:function(i){return this.main+this[i];}
     }
 };
 
 function popup() {
 
     s = {
-        url:{
-            main:'http://facebook.webtop.pl/templates/tests/',
-            test:'db_test.php',
-            ajax:'do.php',
-            for:function(i){return this.main+this[i];}
-        },
         get:function(callback){
-            $.getJSON(this.url.for("test"), options.get(), function(data) {
+            $.getJSON(options.url.for("test"), options.get(), function(data) {
                 if(data.user==false) {
                     s.login.show();
                 }
@@ -151,7 +152,7 @@ function popup() {
                     });
             },
             auth:function(){
-                $.post(s.url.for("ajax"), $(this).serialize(), function(data){
+                $.post(options.url.for("ajax"), $(this).serialize(), function(data){
                     $('#loader').hide();
                     if(data.success) s.login.kill();
                     else {
@@ -188,10 +189,6 @@ function popup() {
             }
         }
     }
-
-    // TODO: get database settings object here
-    // TODO: s.init( db.settings_object );
-    //s.get();
 }
 function settings() {
     s = {
@@ -206,6 +203,14 @@ function settings() {
             "Automatycznie",
             "Zawsze Włączone"
         ],
+        interval:[
+            "Tylko na żądanie",
+            "co 7 sekund",
+            "co 42 sekundy",
+            "co 7 minut",
+            "co 42 minuty",
+            "co 84 minuty"
+        ],
         days:"dni",
         manual:["Nie","Tak,"],
         dev:["Nie","Tak,"],
@@ -219,13 +224,13 @@ function settings() {
             }
             this.fixLabels();
         },
-        fixLabel:function(onchange){
+        fixLabel:function( onchange ){
             if($(this).attr('type')=="range"){
                 var label="",
                     min=$(this).attr('min'),
                     n=$(this).parent().attr('title'),
                     j=parseInt($(this).val()),
-                    i=j-min; // fix for when min!=0
+                    i=j-min; // it's a fix for when min!=0
 
                 if(typeof s[n]==="object") do label=s[n][j-min]+label;while(label[1]==="+"&&--j>=0);
                 else label=j+s[n];
@@ -248,14 +253,14 @@ function settings() {
     $('input').change(function(){ s.fixLabel.call( $(this), true ); });
 }
 function background(){
-    return false;
     var check = function(){
-
+        $.getJSON(options.url.for("test"), $.extend(options.get(),{level:0}), function(data) { // always use lowest level for better performance
+            if( data.error ) chrome.browserAction.setIcon({path:'error.png'});
+            else chrome.browserAction.setIcon({path:'icon.png'});
+        });
     },
-    int = setInterval(check,10000);
+    int = setInterval(check,42000);
 }
-
-var s;
 
 function init(){
     db.getSettings();
