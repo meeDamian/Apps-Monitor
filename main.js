@@ -256,8 +256,8 @@ function settings() {
 function background(){
     var check = function(){
         $.getJSON(options.url.for("test"), $.extend(options.get(),{level:0}), function(data) { // always use lowest level for better performance
-            if( data.error ) chrome.browserAction.setIcon({path:'error.png'});
-            else chrome.browserAction.setIcon({path:'icon.png'});
+            if( data.success ) chrome.browserAction.setIcon({path:'icon.png'});
+            else chrome.browserAction.setIcon({path:'error.png'});
         });
     },
     int = setInterval(check,42000);
