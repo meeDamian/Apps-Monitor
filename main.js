@@ -167,6 +167,7 @@ function popup() {
         },
         raport:{
             show:function(data){
+                // TODO: handle case where there's no data.error, but data.succes instead (?level=0&plugin=1)
                 $('#loader').hide();
                 if(data.error) {
                     chrome.browserAction.setIcon({path:'error.png'});
@@ -191,7 +192,6 @@ function popup() {
 
     // TODO: get database settings object here
     // TODO: s.init( db.settings_object );
-    //s.get();
 }
 function settings() {
     s = {
