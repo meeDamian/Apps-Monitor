@@ -4,8 +4,8 @@
     "description": "Extension used to monitor apps over the JSON handle",
     "options_page":"settings.html",
     "browser_action": {
-        "default_icon": "icon.png",
-        "default_popup": "res/states.html",
+        "default_icon": "res/icon.png",
+        "default_popup": "states.html",
         "default_title": "Apps Monitor"
     },
     "background":{"scripts":["jquery.js","main.js"]},
