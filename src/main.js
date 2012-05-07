@@ -171,10 +171,10 @@ function popup() {
                 // TODO: handle case where there's no data.error, but data.succes instead (?level=0&plugin=1)
                 $('#loader').hide();
                 if(data.error) {
-                    chrome.browserAction.setIcon({path:'error.png'});
+                    chrome.browserAction.setIcon({path:'res/error.png'});
                     $('#quickInfo span').addClass('error').text('Wystąpił błąd!');
                 } else {
-                    chrome.browserAction.setIcon({path:'icon.png'});
+                    chrome.browserAction.setIcon({path:'res/icon.png'});
                     $('#quickInfo span').addClass('success').text('Wszystko jest OK. ');
                 }
 
@@ -256,8 +256,8 @@ function settings() {
 function background(){
     var check = function(){
         $.getJSON(options.url.for("test"), $.extend(options.get(),{level:0}), function(data) { // always use lowest level for better performance
-            if( data.success ) chrome.browserAction.setIcon({path:'icon.png'});
-            else chrome.browserAction.setIcon({path:'error.png'});
+            if( data.success ) chrome.browserAction.setIcon({path:'res/icon.png'});
+            else chrome.browserAction.setIcon({path:'res/error.png'});
         });
     },
     int = setInterval(check,42000);
