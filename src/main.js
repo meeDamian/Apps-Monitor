@@ -86,6 +86,19 @@ window.db = {
         }
         cursorRequest.onerror = db.onerror;
     },
+    getSetting:function( v ){
+        var t = db.h.transaction([db._settings], IDBTransaction.READ_ONLY),
+            s = t.objectStore(db._settings),
+            kr = IDBKeyRange.only( v ),
+            cursorRequest = s.openCursor( kr );
+
+        cursorRequest.onsuccess = function(e) {
+            var tmp={};
+            tmp[ v ] = (e.target.result!==null) ? e.target.result.value.value : null;
+            options.restore( tmp );
+        }
+        cursorRequest.onerror = db.onerror;
+    },
     onerror:function(e){ // is called on error; TODO: improve error reporting here
         console.log("Masz blad debilu:");
         console.log(e);
@@ -99,9 +112,14 @@ window.options = {
     manual:{ v:null, d:false },
     days:{ v:null, d:2 },
     params:{ v:null, d:false },
-    interval:{v:null, d:2 },
+    interval:{v:null, d:2, vs:[0,7,42,420,2520,5040] },
     get:function(arg0) { // if no arguments given - returns map, if valid key given returns it's value
-        if(typeof arg0=="string")return(arg0 in this&&typeof this[arg0]!=="function")?(this[arg0].v!==null)?this[arg0].v:this[arg0].d:null;
+        if(typeof arg0=="string") {
+            if( arg0 in this && typeof this[arg0]!=="function" ){
+                var v = ( this[ arg0 ].v!==null ) ? this[ arg0 ].v : this[ arg0 ].d;
+                return ( this[ arg0 ].vs !== undefined ) ? this[ arg0 ].vs[ v ] : v;
+            } else return null;
+        }
         var r={};
         for(i in this)if(typeof this[i]!=='function'&&this[i].v!==null)r[i]=this[i].v;
         r.plugin=1; // is added here because it cannot be different -  unchangeable!!!
@@ -253,22 +271,62 @@ function settings() {
 
     $('input').change(function(){ s.fixLabel.call( $(this), true ); });
 }
-function background(){
-    var check = function(){
+
+var background = {
+    tm: null, // currently used timeout in seconds
+    int: null, // handler for setTimeout
+    int2:null,
+    _fixTm: function() {
+
+        var tm = options.get('interval')*1000;
+
+        // if it has change or isn't yet set
+        if( background.tm===null || background.tm!=tm) {
+            var str="fixInterval()";
+
+            if( background.int!==null ) {
+                str+="->clear("+background.tm+")";
+                window.clearInterval( background.int );
+                background.int = null;
+            }
+            background.tm = tm;
+            if(background.tm!==0){
+                str+="->setInterval("+background.tm+")";
+                background.int = window.setInterval( background._check, background.tm );
+            }
+            console.log( str );
+        }
+
+        // trigger interval update in options object (from db)
+        db.getSetting('interval');
+    },
+    _check: function() {
+        var str = "getData()";
         $.getJSON(options.url.for("test"), $.extend(options.get(),{level:0}), function(data) { // always use lowest level for better performance
-            if( data.success ) chrome.browserAction.setIcon({path:'res/icon.png'});
-            else chrome.browserAction.setIcon({path:'res/error.png'});
+            if( data.success ) {
+                str+="->success";
+                chrome.browserAction.setIcon({path:'res/icon.png'});
+            }
+            else {
+                str+="->error";
+                chrome.browserAction.setIcon({path:'res/error.png'});
+            }
+            console.log( str );
         });
     },
-    int = setInterval(check,42000);
+    init: function() {
+        this.int2 = window.setInterval(this._fixTm,5000);
+        this._check();
+    }
 }
+
 
 function init(){
     db.getSettings();
 
     if( $('body#popup').length ) popup();
     else if( $('body#settings').length ) settings();
-    else background();
+    else background.init();
 }
 
 $(function(){
